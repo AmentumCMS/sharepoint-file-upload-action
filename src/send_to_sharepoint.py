@@ -40,15 +40,15 @@ def acquire_token():
     token = app.acquire_token_for_client(scopes=[f"https://{graph_endpoint}/.default"])
     return token
 
-def construct_request(request):
+#Replace office365 request url with the correct endpoint for non-default environments
+def rewrite_endpoint(request):
     request.url = request.url.replace(
         "https://graph.microsoft.com", f"https://{graph_endpoint}"
     )
-
+ 
 client = GraphClient(acquire_token)
-if(graph_endpoint != "graph.microsoft.com"):
-    client.pending_request().beforeExecute += construct_request
-drive = client.sites.get_by_url(tenant_url).drive.root.get_by_path(upload_path)
+client.before_execute(rewrite_endpoint, False)
+drive = client.sites.get_by_url(tenant_url).drive.root.get_by_path(upload_path).execute_query()
 
 def progress_status(offset, file_size):
     print(f"Uploaded {offset} bytes from {file_size} bytes ... {offset/file_size*100:.2f}%")
