@@ -45,10 +45,10 @@ def rewrite_endpoint(request):
     request.url = request.url.replace(
         "https://graph.microsoft.com", f"https://{graph_endpoint}"
     )
- 
+
 client = GraphClient(acquire_token)
 client.before_execute(rewrite_endpoint, False)
-drive = client.sites.get_by_url(tenant_url).drive.root.get_by_path(upload_path).execute_query()
+drive = client.sites.get_by_url(tenant_url).drive.root.get_by_path(upload_path)
 
 def progress_status(offset, file_size):
     print(f"Uploaded {offset} bytes from {file_size} bytes ... {offset/file_size*100:.2f}%")
