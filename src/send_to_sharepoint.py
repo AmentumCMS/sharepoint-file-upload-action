@@ -33,9 +33,6 @@ if not local_files:
     sys.exit(1)
 
 def acquire_token():
-    """
-    Acquire token via MSAL
-    """
     authority_url = f'https://{login_endpoint}/{tenant_id}'
     app = msal.ConfidentialClientApplication(
         authority=authority_url,
@@ -43,6 +40,8 @@ def acquire_token():
         client_credential=client_secret
     )
     token = app.acquire_token_for_client(scopes=[f"https://{graph_endpoint}/.default"])
+    if "access_token" not in token:
+        raise RuntimeError(f"Token acquisition failed: {token.get('error')}: {token.get('error_description')}")
     return token
 
 #Replace office365 request url with the correct endpoint for non-default environments
@@ -82,9 +81,7 @@ def resumable_upload(drive, local_path, file_size, chunk_size, max_chunk_retry, 
                         time.sleep(retry_seconds)
     
     file_name = os.path.basename(local_path)
-    return_type = DriveItem(
-        drive.context, 
-        UrlPath(file_name, drive.resource_path))
+    return_type = drive.get_by_path(file_name)
     qry = UploadSessionQuery(
         return_type, {"item": DriveItemUploadableProperties(name=file_name)})
     drive.context.add_query(qry).after_query_execute(_start_upload)
