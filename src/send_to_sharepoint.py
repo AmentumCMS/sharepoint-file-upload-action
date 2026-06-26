@@ -67,7 +67,6 @@ def rewrite_endpoint(request):
 
 client = GraphClient(acquire_token)
 client.before_execute(rewrite_endpoint, False)
-drive = client.sites.get_by_url(tenant_url).drive.root.get_by_path(upload_path)
 
 def progress_status(offset, file_size):
     print(f"Uploaded {offset} bytes from {file_size} bytes ... {offset/file_size*100:.2f}%")
@@ -75,7 +74,7 @@ def progress_status(offset, file_size):
 def success_callback(remote_file):
     print(f"[✓]File {remote_file.web_url} has been uploaded")
 
-def resumable_upload(drive, local_path, file_size, chunk_size, max_chunk_retry, timeout_secs):
+def resumable_upload(local_path, file_size, chunk_size, max_chunk_retry, timeout_secs):
     def _start_upload():
         with open(local_path, "rb") as local_file:
             session_request = UploadSessionRequest(
@@ -104,24 +103,31 @@ def resumable_upload(drive, local_path, file_size, chunk_size, max_chunk_retry, 
     return_type.get().execute_query()
     success_callback(return_type)
 
-def upload_file(drive, local_path, chunk_size):
+def upload_file(local_path, chunk_size):
     file_size = os.path.getsize(local_path)
     if file_size < chunk_size:
+        drive = client.sites.get_by_url(tenant_url).drive.root.get_by_path(upload_path)
         remote_file = drive.upload_file(local_path).execute_query()
         success_callback(remote_file)
     else:
         resumable_upload(
-            drive, 
-            local_path, 
-            file_size, 
-            chunk_size, 
-            max_chunk_retry=60, 
+            local_path,
+            file_size,
+            chunk_size,
+            max_chunk_retry=60,
             timeout_secs=10*60)
 
 for f in local_files:
   for i in range(max_retry):
+    # Each retry must start from an empty query queue: execute_query() stops
+    # at the first failed request and leaves everything queued after it
+    # sitting in client._queries, since client/context is shared across
+    # retries. Without clearing, the next retry's queries pile up behind
+    # whatever didn't run yet, and the error you see can be a stale query
+    # from an earlier attempt rather than the current one.
+    client.clear()
     try:
-        upload_file(drive, f, 4*1024*1024)
+        upload_file(f, 4*1024*1024)
         break
     except Exception as e:
         print(f"Unexpected error occurred: {e}, {type(e)}")
