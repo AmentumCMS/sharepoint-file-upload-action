@@ -9,6 +9,21 @@ from office365.onedrive.driveitems.driveItem import DriveItem
 from office365.onedrive.internal.paths.url import UrlPath
 from office365.runtime.queries.upload_session import UploadSessionQuery
 from office365.onedrive.driveitems.uploadable_properties import DriveItemUploadableProperties
+from office365.runtime.queries.client_query import ClientQuery
+from office365.runtime.queries.service_operation import ServiceOperationQuery
+
+# office365-rest-python-client (2.5.3 through at least 2.6.2) double-slashes
+# service-operation URLs (e.g. createUploadSession) on path-addressed items:
+# UrlPath.segment already ends in "/" (":/name:/"), and ServiceOperationQuery.url
+# joins another "/" on top, producing ".../file.iso://createUploadSession".
+# Strip the trailing slash before joining to fix the URL without forking the lib.
+def _fixed_service_operation_url(self):
+    orig_url = ClientQuery.url.fget(self)
+    if self.static:
+        return "".join([self.context.service_root_url(), str(self.path)])
+    return "/".join([orig_url.rstrip("/"), self.path.segment])
+
+ServiceOperationQuery.url = property(_fixed_service_operation_url)
 
 site_name = sys.argv[1]
 sharepoint_host_name = sys.argv[2]
