@@ -79,12 +79,13 @@ def resumable_upload(drive, local_path, file_size, chunk_size, max_chunk_retry, 
                             raise e
                         print(f"Retry {retry_number}: {e}")
                         time.sleep(retry_seconds)
-    
+
     file_name = os.path.basename(local_path)
-    return_type = drive.get_by_path(file_name)
+    full_remote_path = f"{upload_path.strip('/')}/{file_name}"
+    return_type = client.sites.get_by_url(tenant_url).drive.root.get_by_path(full_remote_path)
     qry = UploadSessionQuery(
         return_type, {"item": DriveItemUploadableProperties(name=file_name)})
-    drive.context.add_query(qry).after_query_execute(_start_upload)
+    return_type.context.add_query(qry).after_query_execute(_start_upload)
     return_type.get().execute_query()
     success_callback(return_type)
 
